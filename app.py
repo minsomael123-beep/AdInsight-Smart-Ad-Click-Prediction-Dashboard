@@ -3,6 +3,9 @@ import numpy as np
 import joblib
 import pandas as pd
 import os
+import tempfile
+import zipfile
+import shutil
 
 # محاولة استيراد Keras
 try:
@@ -13,80 +16,93 @@ except ImportError:
 
 st.set_page_config(page_title="Ad Click Predictor", layout="wide")
 
-# تحديد مسارات الملفات
-MODEL_H5 = "log.h5"       # إذا الموديل HDF5
-MODEL_SAVED = "log"       # إذا الموديل SavedModel (فولدر)
-SCALER_PATH = "scaler.h5" # ملف السكالر
+st.title("📊 Ad Click Prediction Dashboard")
+st.sidebar.header("Upload Your Model & Scaler")
 
-# دالة لتحميل الموديل بأمان
-def safe_load_model():
-    if os.path.exists(MODEL_H5):
+# رفع الموديل HDF5 أو فولدر مضغوط SavedModel
+uploaded_model = st.sidebar.file_uploader("Upload Model (.h5 or .zip for SavedModel folder)", type=["h5", "zip"])
+uploaded_scaler = st.sidebar.file_uploader("Upload Scaler (.h5)", type=["h5"])
+
+model = None
+scaler = None
+
+# دالة لفك فولدر مضغوط SavedModel مؤقتًا
+def unzip_to_temp(zip_file):
+    temp_dir = tempfile.mkdtemp()
+    with zipfile.ZipFile(zip_file, "r") as zip_ref:
+        zip_ref.extractall(temp_dir)
+    return temp_dir
+
+# تحميل الموديل بعد رفعه
+if uploaded_model is not None:
+    if uploaded_model.name.endswith(".h5"):
         try:
-            model = load_model(MODEL_H5)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as tmp_file:
+                tmp_file.write(uploaded_model.read())
+                tmp_file.flush()
+                model = load_model(tmp_file.name)
             st.success("تم تحميل موديل HDF5 بنجاح ✅")
-            return model
         except Exception as e:
-            st.warning(f"فشل تحميل HDF5: {e}")
-    if os.path.exists(MODEL_SAVED):
+            st.error(f"فشل تحميل HDF5: {e}")
+    elif uploaded_model.name.endswith(".zip"):
         try:
-            model = load_model(MODEL_SAVED)
-            st.success("تم تحميل موديل SavedModel بنجاح ✅")
-            return model
+            temp_folder = unzip_to_temp(uploaded_model)
+            model = load_model(temp_folder)
+            st.success("تم تحميل موديل SavedModel من ZIP بنجاح ✅")
+            shutil.rmtree(temp_folder)  # تنظيف الملفات المؤقتة
         except Exception as e:
-            st.warning(f"فشل تحميل SavedModel: {e}")
-    st.error("لم يتم العثور على أي موديل صالح!")
-    st.stop()
-
-# تحميل الموديل
-model = safe_load_model()
+            st.error(f"فشل تحميل SavedModel: {e}")
+    else:
+        st.error("صيغة الملف غير مدعومة!")
+else:
+    st.warning("يرجى رفع موديل للعمل على التنبؤ.")
 
 # تحميل السكالر
-if os.path.exists(SCALER_PATH):
+if uploaded_scaler is not None:
     try:
-        scaler = joblib.load(SCALER_PATH)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as tmp_scaler:
+            tmp_scaler.write(uploaded_scaler.read())
+            tmp_scaler.flush()
+            scaler = joblib.load(tmp_scaler.name)
         st.success("تم تحميل السكالر بنجاح ✅")
     except Exception as e:
-        st.error(f"حدث خطأ أثناء تحميل السكالر: {e}")
-        st.stop()
+        st.error(f"فشل تحميل السكالر: {e}")
 else:
-    st.error("ملف السكالر غير موجود!")
-    st.stop()
+    st.warning("يرجى رفع السكالر للعمل على التنبؤ.")
 
-# واجهة Streamlit
-st.title("📊 Ad Click Prediction Dashboard")
-st.sidebar.header("Enter User Data")
+# واجهة المستخدم للتنبؤ
+if model is not None and scaler is not None:
+    st.sidebar.header("Enter User Data")
 
-daily_time = st.sidebar.number_input("Daily Time Spent on Site")
-age = st.sidebar.number_input("Age")
-area_income = st.sidebar.number_input("Area Income")
-daily_internet = st.sidebar.number_input("Daily Internet Usage")
-male = st.sidebar.selectbox("Gender", ["Female", "Male"])
-male = 1 if male == "Male" else 0
+    daily_time = st.sidebar.number_input("Daily Time Spent on Site")
+    age = st.sidebar.number_input("Age")
+    area_income = st.sidebar.number_input("Area Income")
+    daily_internet = st.sidebar.number_input("Daily Internet Usage")
+    male = st.sidebar.selectbox("Gender", ["Female", "Male"])
+    male = 1 if male == "Male" else 0
 
-# زر التنبؤ
-if st.sidebar.button("Predict"):
-    features = np.array([[daily_time, age, area_income, daily_internet, male]])
-    features_scaled = scaler.transform(features)
-    prediction = model.predict(features_scaled)
-    probability = prediction[0][0]
+    if st.sidebar.button("Predict"):
+        features = np.array([[daily_time, age, area_income, daily_internet, male]])
+        features_scaled = scaler.transform(features)
+        prediction = model.predict(features_scaled)
+        probability = prediction[0][0]
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Probability", f"{probability:.2%}")
-    with col2:
-        if probability >= 0.5:
-            st.success("User WILL Click the Ad 🎯")
-        else:
-            st.error("User will NOT Click the Ad ❌")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Probability", f"{probability:.2%}")
+        with col2:
+            if probability >= 0.5:
+                st.success("User WILL Click the Ad 🎯")
+            else:
+                st.error("User will NOT Click the Ad ❌")
 
-# التنبؤ بالجماعي CSV
-uploaded_file = st.file_uploader("Upload CSV for Bulk Prediction")
-if uploaded_file:
-    df = pd.read_csv(uploaded_file)
-    df_scaled = scaler.transform(df)
-    preds = model.predict(df_scaled)
-    df["Prediction"] = (preds > 0.5).astype(int)
+    uploaded_file = st.file_uploader("Upload CSV for Bulk Prediction")
+    if uploaded_file:
+        df = pd.read_csv(uploaded_file)
+        df_scaled = scaler.transform(df)
+        preds = model.predict(df_scaled)
+        df["Prediction"] = (preds > 0.5).astype(int)
 
-    st.write(df.head())
-    st.bar_chart(df["Prediction"].value_counts())
+        st.write(df.head())
+        st.bar_chart(df["Prediction"].value_counts())
 

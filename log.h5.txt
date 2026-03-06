@@ -1,0 +1,52 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+import joblib
+
+# ---------------------------
+# 1️⃣ تحميل البيانات
+# ---------------------------
+df = pd.read_csv("advertising.csv")  # ضع مسار ملف الداتا عندك
+
+# اختيار الخصائص والهدف
+X = df[['Daily Time Spent on Site','Age','Area Income','Daily Internet Usage','Male']].values
+y = df['Clicked on Ad'].values
+
+# تقسيم البيانات لتدريب واختبار
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# ---------------------------
+# 2️⃣ تجهيز السكالر
+# ---------------------------
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# حفظ السكالر لاستخدامه لاحقًا
+joblib.dump(scaler, "scaler.h5")
+print("✅ تم حفظ السكالر: scaler.h5")
+
+# ---------------------------
+# 3️⃣ إنشاء الموديل
+# ---------------------------
+model = Sequential([
+    Dense(16, activation='relu', input_shape=(X_train_scaled.shape[1],)),
+    Dense(8, activation='relu'),
+    Dense(1, activation='sigmoid')  # هدف ثنائي
+])
+
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+# ---------------------------
+# 4️⃣ تدريب الموديل
+# ---------------------------
+history = model.fit(X_train_scaled, y_train, epochs=20, batch_size=16, validation_split=0.2)
+
+# ---------------------------
+# 5️⃣ حفظ الموديل بصيغة HDF5
+# ---------------------------
+model.save("log.h5")
+print("✅ تم حفظ الموديل: log.h5")

@@ -2,15 +2,46 @@ import streamlit as st
 import numpy as np
 import joblib
 import pandas as pd
-from tensorflow.keras.models import load_model
+import os
+
+# محاولة استيراد Keras
+try:
+    from tensorflow.keras.models import load_model
+except ImportError:
+    st.error("TensorFlow/Keras غير مثبت. رجاءً ثبته باستخدام: pip install tensorflow")
+    st.stop()
 
 st.set_page_config(page_title="Ad Click Predictor", layout="wide")
 
-# تحميل الموديل
-model = load_model("log.h5")
+# تحديد مسارات الملفات
+MODEL_PATH_H5 = "log.h5"
+MODEL_PATH_SAVED = "log"  # لو الموديل محفوظ بصيغة SavedModel
+SCALER_PATH = "scaler.h5"
+
+# تحميل الموديل بطريقة آمنة
+model = None
+if os.path.exists(MODEL_PATH_H5):
+    try:
+        model = load_model(MODEL_PATH_H5)
+        st.success("تم تحميل موديل HDF5 بنجاح ✅")
+    except Exception as e:
+        st.error(f"حدث خطأ أثناء تحميل HDF5: {e}")
+elif os.path.exists(MODEL_PATH_SAVED):
+    try:
+        model = load_model(MODEL_PATH_SAVED)
+        st.success("تم تحميل موديل SavedModel بنجاح ✅")
+    except Exception as e:
+        st.error(f"حدث خطأ أثناء تحميل SavedModel: {e}")
+else:
+    st.error("ملف الموديل غير موجود في المسار المحدد!")
+    st.stop()
 
 # تحميل السكالر
-scaler = joblib.load("scaler.h5")
+if os.path.exists(SCALER_PATH):
+    scaler = joblib.load(SCALER_PATH)
+else:
+    st.error("ملف السكالر غير موجود!")
+    st.stop()
 
 st.title("📊 Ad Click Prediction Dashboard")
 
@@ -25,7 +56,6 @@ male = st.sidebar.selectbox("Gender", ["Female", "Male"])
 male = 1 if male == "Male" else 0
 
 if st.sidebar.button("Predict"):
-
     features = np.array([[daily_time, age, area_income, daily_internet, male]])
     features_scaled = scaler.transform(features)
 

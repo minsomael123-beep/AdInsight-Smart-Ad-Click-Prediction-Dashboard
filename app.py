@@ -17,13 +17,38 @@ st.markdown("Predict whether a user will click an ad based on their behavior and
 model = joblib.load("log.h5")
 scaler = joblib.load("scaler.h5")
 
-# --- Define Features manually ---
-scaler_features = [
-    "daily_time", "age", "area_income", "daily_internet", "male",
-    "country_US", "country_UK", "country_CA", "source_Facebook"
+# --- Define numeric and other features manually ---
+numeric_features = ["daily_time", "age", "area_income", "daily_internet"]
+binary_features = ["male", "source_Facebook"]
+
+# --- List of all countries (used for dropdown & One-Hot) ---
+countries = [
+    "Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda","Argentina",
+    "Armenia","Australia","Austria","Azerbaijan","Bahamas","Bahrain","Bangladesh","Barbados",
+    "Belarus","Belgium","Belize","Benin","Bhutan","Bolivia","Bosnia and Herzegovina","Botswana",
+    "Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Côte d'Ivoire","Cabo Verde","Cambodia",
+    "Cameroon","Canada","Central African Republic","Chad","Chile","China","Colombia","Comoros",
+    "Congo (Congo-Brazzaville)","Costa Rica","Croatia","Cuba","Cyprus","Czechia","Democratic Republic of the Congo",
+    "Denmark","Djibouti","Dominica","Dominican Republic","Ecuador","Egypt","El Salvador","Equatorial Guinea",
+    "Eritrea","Estonia","Eswatini","Ethiopia","Fiji","Finland","France","Gabon","Gambia","Georgia",
+    "Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti",
+    "Holy See","Honduras","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel",
+    "Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kuwait","Kyrgyzstan",
+    "Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg",
+    "Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius",
+    "Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Morocco","Mozambique","Myanmar",
+    "Namibia","Nauru","Nepal","Netherlands","New Zealand","Nicaragua","Niger","Nigeria","North Korea",
+    "North Macedonia","Norway","Oman","Pakistan","Palau","Palestine State","Panama","Papua New Guinea",
+    "Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania","Russia","Rwanda","Saint Kitts and Nevis",
+    "Saint Lucia","Saint Vincent and the Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia",
+    "Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia",
+    "South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Sweden","Switzerland","Syria",
+    "Tajikistan","Tanzania","Thailand","Timor-Leste","Togo","Tonga","Trinidad and Tobago","Tunisia","Turkey",
+    "Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay",
+    "Uzbekistan","Vanuatu","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe"
 ]
 
-# --- Friendly Labels ---
+# --- Friendly Labels for numeric/binary features ---
 feature_labels = {
     "daily_time": "⏱ Daily Time Spent on Site (minutes)",
     "age": "🎂 Age of User",
@@ -41,15 +66,15 @@ user_input = {}
 user_input["male"] = st.sidebar.selectbox(feature_labels["male"], [0,1])
 
 # Country Dropdown
-countries = ["USA", "UK", "Canada"]
 selected_country = st.sidebar.selectbox("🌍 Select Country", countries)
 
-# Map selected country to One-Hot Encoding
-for feat in ["country_US","country_UK","country_CA"]:
-    user_input[feat] = 1 if feat == f"country_{selected_country}" else 0
+# One-Hot Encoding for countries
+for c in countries:
+    col_name = f"country_{c.replace(' ','_')}"
+    user_input[col_name] = 1 if c == selected_country else 0
 
 # Other numeric inputs
-for feat in ["daily_time","age","area_income","daily_internet"]:
+for feat in numeric_features:
     user_input[feat] = st.sidebar.number_input(feature_labels[feat], value=0.0)
 
 # Source
@@ -82,12 +107,12 @@ if uploaded_file:
     df = pd.read_csv(uploaded_file)
 
     # Add missing columns with 0
-    for feat in scaler_features:
+    for feat in user_input.keys():
         if feat not in df.columns:
             df[feat] = 0
 
-    # Arrange columns in the same order as scaler
-    df_ordered = df[scaler_features]
+    # Arrange columns in the same order as model expects
+    df_ordered = df[list(user_input.keys())]
 
     try:
         df_scaled = scaler.transform(df_ordered)
@@ -102,7 +127,3 @@ if uploaded_file:
         st.bar_chart(df["Prediction"].value_counts())
     except ValueError as e:
         st.error(f"Error transforming CSV data: {e}")
-
-
-
-

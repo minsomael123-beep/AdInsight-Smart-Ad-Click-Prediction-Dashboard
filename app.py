@@ -6,36 +6,18 @@ import joblib
 # --- Page Config ---
 st.set_page_config(
     page_title="Ad Click Predictor",
-    page_icon="📊",
     layout="wide"
 )
 
-# --- Custom Theme Colors ---
-primaryColor = "#4CAF50"
-secondaryColor = "#2196F3"
-
-st.markdown(
-    f"""
-    <style>
-        .stApp {{ background-color: #f5f5f5; }}
-        .stButton>button {{ background-color: {primaryColor}; color: white; }}
-        .stMetric-label {{ color: {secondaryColor}; }}
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
 # --- Header ---
-st.image("logo.png", width=120)  # ضع شعارك هنا
 st.title("📊 Ad Click Prediction Dashboard")
-st.markdown(
-    "Predict whether a user will click an ad based on their behavior and profile."
-)
+st.markdown("Predict whether a user will click an ad based on their behavior and profile.")
 
 # --- Load Model & Scaler ---
 model = joblib.load("log.h5")
 scaler = joblib.load("scaler.h5")
 
+# --- Get Scaler Feature Names ---
 scaler_features = getattr(scaler, 'feature_names_in_', None)
 if scaler_features is None:
     st.error("Cannot find feature names in the scaler. Retrain the scaler with feature_names_in_ set.")
@@ -76,10 +58,12 @@ uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
 
+    # Add missing columns with 0
     for feat in scaler_features:
         if feat not in df.columns:
             df[feat] = 0
 
+    # Arrange columns in the same order as scaler
     df_ordered = df[scaler_features]
 
     try:

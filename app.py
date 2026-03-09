@@ -3,28 +3,58 @@ import pandas as pd
 import numpy as np
 import joblib
 
-# إعداد الصفحة
-st.set_page_config(page_title="Ad Click Predictor", layout="wide")
-st.title("📊 Ad Click Prediction Dashboard")
-st.markdown("Predict whether a user will click an ad based on their behavior and profile.")
+# --- Page Config ---
+st.set_page_config(
+    page_title="Ad Click Predictor",
+    page_icon="📊",
+    layout="wide"
+)
 
-# تحميل الموديل والسكالر
+# --- Custom Theme Colors ---
+primaryColor = "#4CAF50"
+secondaryColor = "#2196F3"
+
+st.markdown(
+    f"""
+    <style>
+        .stApp {{ background-color: #f5f5f5; }}
+        .stButton>button {{ background-color: {primaryColor}; color: white; }}
+        .stMetric-label {{ color: {secondaryColor}; }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# --- Header ---
+st.image("logo.png", width=120)  # ضع شعارك هنا
+st.title("📊 Ad Click Prediction Dashboard")
+st.markdown(
+    "Predict whether a user will click an ad based on their behavior and profile."
+)
+
+# --- Load Model & Scaler ---
 model = joblib.load("log.h5")
 scaler = joblib.load("scaler.h5")
 
-# Sidebar لإدخال بيانات فردية
-st.sidebar.header("Enter User Data")
-daily_time = st.sidebar.number_input("Daily Time Spent on Site", value=68.0)
-age = st.sidebar.number_input("Age", value=35)
-area_income = st.sidebar.number_input("Area Income", value=60000)
-daily_internet = st.sidebar.number_input("Daily Internet Usage", value=180)
-male = st.sidebar.selectbox("Gender", ["Female", "Male"])
-male = 1 if male == "Male" else 0
+scaler_features = getattr(scaler, 'feature_names_in_', None)
+if scaler_features is None:
+    st.error("Cannot find feature names in the scaler. Retrain the scaler with feature_names_in_ set.")
+    st.stop()
+
+# --- Sidebar: Individual Input ---
+st.sidebar.header("👤 Enter User Data")
+user_input = {}
+for feat in scaler_features:
+    if feat.startswith("gender_") or feat.startswith("country_") or feat.startswith("source_"):
+        val = st.sidebar.selectbox(f"{feat}", [0,1])
+    else:
+        val = st.sidebar.number_input(f"{feat}", value=0.0)
+    user_input[feat] = val
 
 if st.sidebar.button("Predict"):
-    features = np.array([[daily_time, age, area_income, daily_internet, male]])
+    features_df = pd.DataFrame([user_input])
     try:
-        features_scaled = scaler.transform(features)
+        features_scaled = scaler.transform(features_df)
         probability = model.predict_proba(features_scaled)[0][1]
 
         col1, col2 = st.columns(2)
@@ -36,34 +66,36 @@ if st.sidebar.button("Predict"):
             else:
                 st.error("User will NOT Click the Ad ❌")
     except ValueError as e:
-        st.error(f"Error in input features: {e}")
+        st.error(f"Error transforming input features: {e}")
 
 st.markdown("---")
-st.subheader("📂 Bulk Prediction (CSV)")
 
+# --- Bulk Prediction ---
+st.subheader("📂 Bulk Prediction (CSV)")
 uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
 
-    required_cols = ["daily_time", "age", "area_income", "daily_internet", "male"]
-    # تحقق من الأعمدة
-    missing_cols = [col for col in required_cols if col not in df.columns]
-    if missing_cols:
-        st.error(f"CSV is missing required columns: {missing_cols}")
-    else:
-        try:
-            df_scaled = scaler.transform(df[required_cols])
-            preds = model.predict_proba(df_scaled)[:, 1]
-            df["Click_Probability"] = preds
-            df["Prediction"] = (preds > 0.5).astype(int)
+    for feat in scaler_features:
+        if feat not in df.columns:
+            df[feat] = 0
 
-            st.write("Preview of Predictions:")
-            st.dataframe(df.head())
+    df_ordered = df[scaler_features]
 
-            st.subheader("📊 Prediction Distribution")
-            st.bar_chart(df["Prediction"].value_counts())
-        except ValueError as e:
-            st.error(f"Error transforming CSV data: {e}")
+    try:
+        df_scaled = scaler.transform(df_ordered)
+        preds = model.predict_proba(df_scaled)[:,1]
+        df["Click_Probability"] = preds
+        df["Prediction"] = (preds > 0.5).astype(int)
+
+        st.write("Preview of Predictions:")
+        st.dataframe(df.head())
+
+        st.subheader("📊 Prediction Distribution")
+        st.bar_chart(df["Prediction"].value_counts())
+    except ValueError as e:
+        st.error(f"Error transforming CSV data: {e}")
+
 
 
 

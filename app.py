@@ -23,30 +23,39 @@ scaler_features = [
     "country_US", "country_UK", "country_CA", "source_Facebook"
 ]
 
-# --- Friendly Labels for User ---
+# --- Friendly Labels ---
 feature_labels = {
     "daily_time": "⏱ Daily Time Spent on Site (minutes)",
     "age": "🎂 Age of User",
     "area_income": "💰 Area Income ($)",
     "daily_internet": "🌐 Daily Internet Usage (minutes)",
     "male": "👨 Gender (0=Female,1=Male)",
-    "country_US": "🇺🇸 Country: USA (0=No,1=Yes)",
-    "country_UK": "🇬🇧 Country: UK (0=No,1=Yes)",
-    "country_CA": "🇨🇦 Country: Canada (0=No,1=Yes)",
     "source_Facebook": "📘 Source: Facebook (0=No,1=Yes)"
 }
 
 # --- Sidebar: Individual Input ---
 st.sidebar.header("👤 Enter User Data")
 user_input = {}
-for feat in scaler_features:
-    label = feature_labels.get(feat, feat)
-    if feat.startswith("male") or feat.startswith("country_") or feat.startswith("source_"):
-        val = st.sidebar.selectbox(label, [0,1])
-    else:
-        val = st.sidebar.number_input(label, value=0.0)
-    user_input[feat] = val
 
+# Gender
+user_input["male"] = st.sidebar.selectbox(feature_labels["male"], [0,1])
+
+# Country Dropdown
+countries = ["USA", "UK", "Canada"]
+selected_country = st.sidebar.selectbox("🌍 Select Country", countries)
+
+# Map selected country to One-Hot Encoding
+for feat in ["country_US","country_UK","country_CA"]:
+    user_input[feat] = 1 if feat == f"country_{selected_country}" else 0
+
+# Other numeric inputs
+for feat in ["daily_time","age","area_income","daily_internet"]:
+    user_input[feat] = st.sidebar.number_input(feature_labels[feat], value=0.0)
+
+# Source
+user_input["source_Facebook"] = st.sidebar.selectbox(feature_labels["source_Facebook"], [0,1])
+
+# Predict button
 if st.sidebar.button("Predict"):
     features_df = pd.DataFrame([user_input])
     try:
@@ -93,7 +102,6 @@ if uploaded_file:
         st.bar_chart(df["Prediction"].value_counts())
     except ValueError as e:
         st.error(f"Error transforming CSV data: {e}")
-
 
 
 

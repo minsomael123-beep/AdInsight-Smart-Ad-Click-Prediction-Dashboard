@@ -17,21 +17,34 @@ st.markdown("Predict whether a user will click an ad based on their behavior and
 model = joblib.load("log.h5")
 scaler = joblib.load("scaler.h5")
 
-# --- Define Features manually (replace with your 9 features) ---
+# --- Define Features manually ---
 scaler_features = [
     "daily_time", "age", "area_income", "daily_internet", "male",
     "country_US", "country_UK", "country_CA", "source_Facebook"
 ]
 
+# --- Friendly Labels for User ---
+feature_labels = {
+    "daily_time": "⏱ Daily Time Spent on Site (minutes)",
+    "age": "🎂 Age of User",
+    "area_income": "💰 Area Income ($)",
+    "daily_internet": "🌐 Daily Internet Usage (minutes)",
+    "male": "👨 Gender (0=Female,1=Male)",
+    "country_US": "🇺🇸 Country: USA (0=No,1=Yes)",
+    "country_UK": "🇬🇧 Country: UK (0=No,1=Yes)",
+    "country_CA": "🇨🇦 Country: Canada (0=No,1=Yes)",
+    "source_Facebook": "📘 Source: Facebook (0=No,1=Yes)"
+}
+
 # --- Sidebar: Individual Input ---
 st.sidebar.header("👤 Enter User Data")
 user_input = {}
 for feat in scaler_features:
-    # For binary features like gender/country/source
-    if feat.startswith("gender_") or feat.startswith("country_") or feat.startswith("source_") or feat == "male":
-        val = st.sidebar.selectbox(f"{feat}", [0,1])
+    label = feature_labels.get(feat, feat)
+    if feat.startswith("male") or feat.startswith("country_") or feat.startswith("source_"):
+        val = st.sidebar.selectbox(label, [0,1])
     else:
-        val = st.sidebar.number_input(f"{feat}", value=0.0)
+        val = st.sidebar.number_input(label, value=0.0)
     user_input[feat] = val
 
 if st.sidebar.button("Predict"):

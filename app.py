@@ -17,17 +17,18 @@ st.markdown("Predict whether a user will click an ad based on their behavior and
 model = joblib.load("log.h5")
 scaler = joblib.load("scaler.h5")
 
-# --- Get Scaler Feature Names ---
-scaler_features = getattr(scaler, 'feature_names_in_', None)
-if scaler_features is None:
-    st.error("Cannot find feature names in the scaler. Retrain the scaler with feature_names_in_ set.")
-    st.stop()
+# --- Define Features manually (replace with your 9 features) ---
+scaler_features = [
+    "daily_time", "age", "area_income", "daily_internet", "male",
+    "country_US", "country_UK", "country_CA", "source_Facebook"
+]
 
 # --- Sidebar: Individual Input ---
 st.sidebar.header("👤 Enter User Data")
 user_input = {}
 for feat in scaler_features:
-    if feat.startswith("gender_") or feat.startswith("country_") or feat.startswith("source_"):
+    # For binary features like gender/country/source
+    if feat.startswith("gender_") or feat.startswith("country_") or feat.startswith("source_") or feat == "male":
         val = st.sidebar.selectbox(f"{feat}", [0,1])
     else:
         val = st.sidebar.number_input(f"{feat}", value=0.0)
